@@ -7,4 +7,4 @@
 5) Open data_cleaner_multi_news and replace directory name with directory of your file location.
 6) Run data_cleaner_multi_news
 
-
+7) Open dpp_summarisation_multi. Run

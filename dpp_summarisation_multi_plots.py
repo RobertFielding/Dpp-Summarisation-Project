@@ -12,10 +12,14 @@ from sentence_features_multi import compute_and_save_features
 from sentence_features_multi import compute_and_save_similarity
 from data_collator_multi import load_datapoints_multi
 from likelihood_computer import *
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mtick
+import numpy as np
 
 
 ResultPoint = namedtuple('ResultPoint', 'file_name extractive_highlights predicted_highlights')
-num_datapoints = 4000
+num_datapoints = 260
+upper_bound_test_cases = 60
 print("started loading data")
 datapoints = load_datapoints_multi(num_datapoints)
 print("finished loading data")
@@ -36,31 +40,11 @@ else:
 print("finish inv_doc")
 
 
-##Run one of EITHER/OR below. If not previously computed or num_datapoints changes run EITHER, else OR
-#EITHER
 similarity_matrices = compute_and_save_similarity(datapoints, inverse_document_frequency_dict)
 feature_matrices = compute_and_save_features(datapoints, similarity_matrices)
-##OR
-# print("loading features")
-# feature_matrices = [np.load(f"train_na=5_saved_features_{i}.npy") for i in range(num_datapoints)]
-# print("finished loading features")
-# print("loading similarity")
-# similarity_matrices = [np.load(f"train_na=5_saved_similarities_{i}.npy") for i in range(num_datapoints)]
-# print("finished loading similarity")
 
 
-## If features/similarities aren't stored as files (NOT RECOMMENDED)
-# print("calculating feature/similarity matrices")
-# for datapoint in datapoints[0: num_datapoints]:
-#     _, article_sentences, cluster_sentences, _, _ = datapoint
-#     features = get_features_multi(article_sentences)
-#     feature_matrices.append(features)
-#     similarity_matrices.append(get_S_multi(cluster_sentences, inverse_document_frequency_dict))
-# print("finished calculating feature/similarity matrices")
-
-
-#
-for i, datapoint in enumerate(datapoints):
+for i, datapoint in enumerate(datapoints[: upper_bound_test_cases]):
     _, articles, cluster_sentences, _, extractive_highlights = datapoint # _ ignores non-relevant data
     features = feature_matrices[i]
 
@@ -93,18 +77,21 @@ def fprime(theta, train_set):
 
 
 #indices of articles in training set and test set
-train_set = range(300)
-test_set = range(300, 450, 1)
+test_set = range(upper_bound_test_cases, num_datapoints, 1)
+num_features = feature_matrices[0].shape[0]
+performance_list_DPP = []
+performance_list_random = []
+performance_list_first_sentence = []
 
-for _ in range(1):
-    num_features = feature_matrices[0].shape[0]
+
+for num_training_points in range(1, upper_bound_test_cases + 1, 1):
+    train_set = range(num_training_points)
 
     theta_0 = np.zeros(num_features) #initial theta for gradient descent
     print("optimizing")
     result = minimize(x0=theta_0, fun=f, jac=fprime, method="CG", args=(train_set,), options={"disp": True})
 
     theta = result.x
-
     print("This is the result of optimization: ", theta)
 
     # next we use the learned theta to produce highlights
@@ -114,13 +101,10 @@ for _ in range(1):
     print("predicting")
     for i in test_set:
         file_name, articles, cluster_sentences, _, extractive_highlights = datapoints[i]
-        articlelen = 0
-        for tab, article in enumerate(articles):
-            articlelen += len(article)
-        print("mean cluster length", articlelen/4, "number_extractive_highlights", len(extractive_highlights))
+
         # dpp model
         assert len(cluster_sentences) == feature_matrices[i].shape[1]
-        print("Length of extracted highlights:", len(extractive_highlights))
+
         predicted_highlights = inference_summary_multi.predict(theta, feature_matrices[i], similarity_matrices[i],
                                                                cluster_sentences, len(extractive_highlights))
 
@@ -136,37 +120,33 @@ for _ in range(1):
         # pick the first few sentences in order model
         first_line_predictions.append(ResultPoint(file_name, extractive_highlights, [a[0] for a in articles]))
 
-
-        ## Useful code to compare articles, extracted highlights and predicted highlights
-        # if i < 10:
-        #     print(f"Cluster {i}")
-        #     for j, article in enumerate(articles):
-        #         print(f"Article {j}")
-        #         for line_num, line in enumerate(article):
-        #             print(line)
-        #             if line_num >= 2:
-        #                 print("...")
-        #                 break
-        #     print("Extractive Summaries")
-        #     for summary in extractive_highlights:
-        #         print(summary)
-        #     print("Predicted Summaries")
-        #     for summary in predicted_highlights:
-        #         print(summary)
-        #     print("")
-
-    def report_performance(preds, name):
+    def report_performance(preds):
         scores = []
         for p in preds:
             extracted = [tuple(h) for h in p.extractive_highlights]
             predicted = [tuple(h) for h in p.predicted_highlights]
             score = len(set(extracted) & set(predicted)) / len(extracted)
             scores.append(score)
-
         performance = np.average(scores)
-        print(f"{name} Model Performance is {performance:0.0%} accuracy")
+        return performance
 
-    report_performance(predictions, "DPP")
-    report_performance(random_predictions, "Random")
-    report_performance(first_line_predictions, "First N")
-    break
+    performance_DPP = report_performance(predictions)
+    performance_list_DPP.append(performance_DPP)
+    performance_random = report_performance(random_predictions)
+    performance_list_random.append(performance_random)
+    performance_first_sentence = report_performance(first_line_predictions)
+    performance_list_first_sentence.append(performance_first_sentence)
+
+x_points_to_plot = range(upper_bound_test_cases)
+y1_points_to_plot = performance_list_DPP
+plt.plot(x_points_to_plot, y1_points_to_plot, label="DPP")
+y2_points_to_plot = performance_list_random
+plt.plot(x_points_to_plot, y2_points_to_plot, label="Random")
+y3_points_to_plot = performance_list_first_sentence
+plt.plot(x_points_to_plot, y3_points_to_plot, label="First Sentence")
+plt.legend()
+plt.xlabel("Number of Training Clusters")
+plt.ylabel("% of Right Sentences Picked")
+ax = plt.axes()
+ax.yaxis.set_major_formatter(mtick.PercentFormatter())
+plt.show()

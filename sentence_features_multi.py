@@ -27,7 +27,7 @@ def get_features_multi(articles, similarity_matrix):
             feature[0, j] = num_sentence_words  # num words
             feature[1, j] = len(sentence_string)  # num chars
             feature[2, j] = i  # position in article
-            feature[3, j] = (np.sum(similarity_matrix[i]) - similarity_matrix[i][i]) / (len(similarity_matrix) -1)                                #mean cluster similarity
+            feature[3, j] = (np.sum(similarity_matrix[i]) - similarity_matrix[i][i]) / (len(similarity_matrix) - 1)        #mean cluster similarity
             feature[4, j] = sum(word[0].isdigit() for word in sentence) / num_sentence_words
 
             nlp_sentence = nlp(sentence_string)
@@ -107,7 +107,7 @@ def compute_and_save_features(datapoints, similarity_matrices):
         feature = get_features_multi(articles, similarity_matrices[i])
         features.append(feature)
     print("finished calculating features")
-    [np.save(f'train_na=5_saved_features_{i}.npy', features[i]) for i in range(len(features))]
+    [np.save(f'train_na=4_saved_features_{i}.npy', features[i]) for i in range(len(features))]
     #saves features to file so that they need not be recomputed
     return features
 
@@ -120,6 +120,6 @@ def compute_and_save_similarity(datapoints, inv_doc_freq_dict):
         similarity = get_S_multi(cluster_sentences, inv_doc_freq_dict)
         similarity_matrices.append(similarity)
     print("finished calculating similarity")
-    [np.save(f'train_na=5_saved_similarities_{i}.npy', similarity_matrices[i]) for i in range(len(similarity_matrices))]
+    [np.save(f'train_na=4_saved_similarities_{i}.npy', similarity_matrices[i]) for i in range(len(similarity_matrices))]
     #saves similarity to file so need not recompute
     return similarity_matrices

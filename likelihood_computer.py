@@ -5,6 +5,7 @@ import numpy as np
 def log_likelihood(theta, L, feature_Y_sum):
     first_term = np.sum(np.matmul(np.transpose(theta), feature_Y_sum))
     sign, logdet = np.linalg.slogdet(L + np.identity(L.shape[0])) #takes log of determinant
+    #assert sign == 1
     return first_term - logdet
 
 

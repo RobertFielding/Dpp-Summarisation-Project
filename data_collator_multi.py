@@ -12,12 +12,12 @@ print("finished loading sentence detector")
 ArticleCluster = namedtuple('ArticleCluster', 'file_name articles cluster_sentences highlights extractive_highlights')
 
 directory = '.'
-filename = 'train_na=5.json'
+filename = 'train_na=4.json'
 
 
 def load_datapoints_multi(num_files=None):
     with open(os.path.join(directory, filename)) as f:
-        # this is the filename of the processed cluster - article cluster of length 5
+        # this is the filename of the processed cluster - article cluster of length 4
         tokenized_output = []
         for line in f:
             cluster = json.loads(line)
@@ -27,7 +27,7 @@ def load_datapoints_multi(num_files=None):
             articles = []
             all_cluster_sentences = []
             for raw_article in raw_articles:
-                article = [s.split() for s in sent_detector.tokenize(raw_article)][:20]  # keep at most 20 sentences per article
+                article = [s.split() for s in sent_detector.tokenize(raw_article)][:30]  # keep at most 20 sentences per article
                 articles.append(article)
                 for sentence in article:
                     all_cluster_sentences.append(sentence)

@@ -23,6 +23,7 @@ def highlight_to_extractive_summary(article_cluster_sentences, highlights):
     for i, highlight in enumerate(highlights):
         sentence_similarity = similarity_matrix[i, :]
         idx = np.random.choice(np.flatnonzero(sentence_similarity == np.max(sentence_similarity)))
+        similarity_matrix[:, idx] = 0 #means sentences are chosen without replacement
         #chooses a random sentence in article cluster with highest similarity to highlight (if multiple)
         extractive_highlight = article_cluster_sentences[idx]
         extractive_summaries.append(extractive_highlight)

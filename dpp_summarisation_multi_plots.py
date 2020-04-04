@@ -19,7 +19,7 @@ import numpy as np
 
 ResultPoint = namedtuple('ResultPoint', 'file_name extractive_highlights predicted_highlights')
 num_datapoints = 260
-upper_bound_test_cases = 60
+upper_bound_train_cases = 60
 print("started loading data")
 datapoints = load_datapoints_multi(num_datapoints)
 print("finished loading data")
@@ -44,7 +44,7 @@ similarity_matrices = compute_and_save_similarity(datapoints, inverse_document_f
 feature_matrices = compute_and_save_features(datapoints, similarity_matrices)
 
 
-for i, datapoint in enumerate(datapoints[: upper_bound_test_cases]):
+for i, datapoint in enumerate(datapoints[: upper_bound_train_cases]):
     _, articles, cluster_sentences, _, extractive_highlights = datapoint # _ ignores non-relevant data
     features = feature_matrices[i]
 
@@ -77,14 +77,17 @@ def fprime(theta, train_set):
 
 
 #indices of articles in training set and test set
-test_set = range(upper_bound_test_cases, num_datapoints, 1)
+test_set = range(upper_bound_train_cases, num_datapoints, 1)
 num_features = feature_matrices[0].shape[0]
 performance_list_DPP = []
 performance_list_random = []
 performance_list_first_sentence = []
+performance_list_DPP_train = []
+performance_list_random_train = []
+performance_list_first_sentence_train = []
 
 
-for num_training_points in range(1, upper_bound_test_cases + 1, 1):
+for num_training_points in range(1, upper_bound_train_cases + 1, 1):
     train_set = range(num_training_points)
 
     theta_0 = np.zeros(num_features) #initial theta for gradient descent
@@ -98,6 +101,9 @@ for num_training_points in range(1, upper_bound_test_cases + 1, 1):
     predictions = []
     random_predictions = []
     first_line_predictions = []
+    predictions_train = []
+    random_predictions_train = []
+    first_line_predictions_train = []
     print("predicting")
     for i in test_set:
         file_name, articles, cluster_sentences, _, extractive_highlights = datapoints[i]
@@ -137,16 +143,66 @@ for num_training_points in range(1, upper_bound_test_cases + 1, 1):
     performance_first_sentence = report_performance(first_line_predictions)
     performance_list_first_sentence.append(performance_first_sentence)
 
-x_points_to_plot = range(upper_bound_test_cases)
+
+
+    for j in train_set:
+        file_name, articles, cluster_sentences, _, extractive_highlights = datapoints[j]
+
+        # dpp model
+        assert len(cluster_sentences) == feature_matrices[j].shape[1]
+
+        predicted_highlights_train = inference_summary_multi.predict(theta, feature_matrices[j], similarity_matrices[j],
+                                                               cluster_sentences, len(extractive_highlights))
+
+        result_point_train = ResultPoint(file_name, extractive_highlights, predicted_highlights_train)
+        predictions_train.append(result_point_train)
+
+        # randomly select sentences model
+        random_prediction_train = ResultPoint(file_name, extractive_highlights,
+                                        random.sample(cluster_sentences,
+                                                      min(len(cluster_sentences), len(extractive_highlights))))
+        random_predictions_train.append(random_prediction_train)
+
+        # pick the first few sentences in order model
+        first_line_predictions_train.append(ResultPoint(file_name, extractive_highlights, [a[0] for a in articles]))
+
+    def report_performance(preds):
+        scores = []
+        for p in preds:
+            extracted = [tuple(h) for h in p.extractive_highlights]
+            predicted = [tuple(h) for h in p.predicted_highlights]
+            score = len(set(extracted) & set(predicted)) / len(extracted)
+            scores.append(score)
+        performance = np.average(scores)
+        return performance
+
+    performance_DPP_train = report_performance(predictions_train)
+    performance_list_DPP_train.append(performance_DPP_train)
+    performance_random_train = report_performance(random_predictions_train)
+    performance_list_random_train.append(performance_random_train)
+    performance_first_sentence_train = report_performance(first_line_predictions_train)
+    performance_list_first_sentence_train.append(performance_first_sentence_train)
+
+x_points_to_plot = range(upper_bound_train_cases)
 y1_points_to_plot = performance_list_DPP
-plt.plot(x_points_to_plot, y1_points_to_plot, label="DPP")
+plt.plot(x_points_to_plot, y1_points_to_plot, label="DPP", c='blue')
 y2_points_to_plot = performance_list_random
-plt.plot(x_points_to_plot, y2_points_to_plot, label="Random")
+plt.plot(x_points_to_plot, y2_points_to_plot, label="Random", c='orange')
 y3_points_to_plot = performance_list_first_sentence
-plt.plot(x_points_to_plot, y3_points_to_plot, label="First Sentence")
+plt.plot(x_points_to_plot, y3_points_to_plot, label="First Sentence", c='green')
 plt.legend()
 plt.xlabel("Number of Training Clusters")
 plt.ylabel("% of Right Sentences Picked")
 ax = plt.axes()
 ax.yaxis.set_major_formatter(mtick.PercentFormatter())
+
+
+
+x_points_to_plot = range(upper_bound_train_cases)
+y1_points_to_plot = performance_list_DPP_train
+plt.plot(x_points_to_plot, y1_points_to_plot, label="DPP", linestyle    ='dotted', c='blue')
+y2_points_to_plot = performance_list_random_train
+plt.plot(x_points_to_plot, y2_points_to_plot, label="Random", linestyle='dotted', c='orange')
+y3_points_to_plot = performance_list_first_sentence_train
+plt.plot(x_points_to_plot, y3_points_to_plot, label="First Sentence", linestyle='dotted', c='green')
 plt.show()
